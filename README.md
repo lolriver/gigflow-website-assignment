@@ -1,45 +1,79 @@
-# GigFlow - Freelance Marketplace
+# GigFlow - Freelance Gigs Marketplace
 
-GigFlow is a dynamic freelance marketplace where businesses connect with top-tier talent.
+GigFlow is a modern, high-performance freelance marketplace platform designed to connect talented professionals with businesses. Built with a focus on speed, user experience, and a clean aesthetic.
 
-## Getting Started
+## 🚀 Tech Stack
+
+- **Frontend Framework**: [React 18](https://reactjs.org/) with [TypeScript](https://www.typescriptlang.org/)
+- **Build Tool**: [Vite](https://vitejs.dev/) for ultra-fast development and optimized builds
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) for utility-first responsive design
+- **UI Components**: [shadcn/ui](https://ui.shadcn.com/) (built on [Radix UI](https://www.radix-ui.com/) primitives)
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **State Management & Data Fetching**: [TanStack Query (React Query) v5](https://tanstack.com/query/latest)
+- **Routing**: [React Router DOM v6](https://reactrouter.com/)
+- **Form Handling**: [React Hook Form](https://react-hook-form.com/) with [Zod](https://zod.dev/) validation
+- **Animations**: [Framer Motion](https://www.framer.com/motion/) for fluid UI transitions
+- **Charts & Visuals**: [Recharts](https://recharts.org/) and [COBE](https://github.com/shuding/cobe) (Interactive Globe)
+
+## 📁 Project Structure
+
+```text
+src/
+├── components/       # Reusable UI elements and functional components
+│   ├── gigs/        # Gig-specific business logic components
+│   ├── layout/      # Shared layout components (Navbar, Footer)
+│   └── ui/          # Core shadcn/ui primitives
+├── contexts/         # Global state management (Auth, Gigs)
+├── hooks/            # Custom React hooks for shared logic
+├── lib/              # Utility functions and shared library configurations
+├── pages/            # Page-level components (Routes)
+└── assets/           # Static assets (images, fonts)
+```
+
+## 🛠️ Getting Started
 
 ### Prerequisites
 
-- Node.js & npm installed
+- [Node.js](https://nodejs.org/) (v18.x or higher)
+- [npm](https://www.npmjs.com/) or [Bun](https://bun.sh/)
 
 ### Installation
 
-```sh
-# Step 1: Clone the repository
-git clone <YOUR_GIT_URL>
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd gigflow
+   ```
 
-# Step 2: Navigate to the project directory
-cd gigflow
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-# Step 3: Install dependencies
-npm i
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-# Step 4: Start the development server
-npm run dev
+### Building for Production
+
+To create an optimized production build:
+```bash
+npm run build
 ```
 
-## Technologies Used
+## 🧩 Key Features
 
-- **Vite**: Next-generation frontend tooling
-- **TypeScript**: Static typing for JavaScript
-- **React**: Library for building user interfaces
-- **shadcn-ui**: Beautifully designed components
-- **Tailwind CSS**: Utility-first CSS framework
-- **Supabase**: Backend-as-a-Service for authentication and database
+- **Gig Discovery**: Browse and search through various professional services.
+- **Detailed Insights**: Comprehensive gig detail pages with reviews and specifications.
+- **Freelancer Dashboard**: Manage postings, track earnings, and view performance metrics.
+- **Secure Authentication**: Built-in flow for login and registration.
+- **Responsive Design**: Fully optimized for mobile, tablet, and desktop views.
+- **Interactive UI**: Engaging elements like an interactive globe and smooth transitions.
 
-## Features
+## 📐 Development Guidelines
 
-- **Project Posting**: Businesses can post their requirements and find the best freelancers.
-- **Freelancer Profiles**: Showcase your skills and find the best gigs.
-- **Safe Payments**: Secure transactions between clients and freelancers.
-- **Real-time Chat**: Connect and collaborate effectively.
-
-## Deployment
-
-You can deploy this project using any modern cloud provider like Vercel, Netlify, or AWS. Ensure you configure your environment variables (Supabase URL, etc.) in your deployment settings.
+- **Component Patterns**: Favor composition and keep components small and focused.
+- **Styling**: Use Tailwind CSS for almost all styling. Avoid custom CSS files unless necessary for complex animations.
+- **Types**: Always define interfaces/types for props and API responses to maintain type safety.
+- **State**: Use TanStack Query for server state and React Context for global UI state.
