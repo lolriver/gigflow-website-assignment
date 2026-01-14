@@ -36,7 +36,7 @@ const CreateGig = () => {
     'Data Science',
     'Other'
   ];
-    
+
   const navigate = useNavigate();
   const { createGig } = useGigs();
   const { user, isAuthenticated } = useAuth();
@@ -65,7 +65,7 @@ const CreateGig = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!title.trim() || !description.trim() || !category || !budget) {
       toast({
         title: 'Error',
@@ -87,7 +87,7 @@ const CreateGig = () => {
 
     setLoading(true);
     try {
-      createGig(title.trim(), description.trim(), category, budgetNum, user!.id, user!.name);
+      createGig(title.trim(), description.trim(), budgetNum, category);
       toast({
         title: 'Gig posted!',
         description: 'Your gig is now live and accepting bids.',
@@ -159,27 +159,27 @@ const CreateGig = () => {
                   </p>
                 </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Select
-                      value={category}
-                      onValueChange={setCategory}
-                    >
-                      <SelectTrigger id="category">
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIES.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={category}
+                    onValueChange={setCategory}
+                  >
+                    <SelectTrigger id="category">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="budget">Budget ($)</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="budget">Budget ($)</Label>
                   <Input
                     id="budget"
                     type="number"

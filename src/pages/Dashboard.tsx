@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,7 +12,7 @@ import { Plus, Briefcase, FileText, DollarSign, Clock, ArrowRight, CheckCircle, 
 import { formatDistanceToNow } from 'date-fns';
 
 const Dashboard = () => {
-  const { getUserGigs, getUserBids } = useGigs();
+  const { gigs, getUserBids } = useGigs();
   const { user, isAuthenticated } = useAuth();
 
   if (!isAuthenticated || !user) {
@@ -36,8 +37,19 @@ const Dashboard = () => {
     );
   }
 
-  const myGigs = getUserGigs(user.id);
-  const myBids = getUserBids(user.id);
+  // Safe filter for My Gigs
+  const myGigs = gigs.filter(g => {
+    const ownerId = (typeof g.ownerId === 'object' && g.ownerId !== null) ? (g.ownerId as any)._id : g.ownerId;
+    return ownerId === user._id;
+  });
+
+  const [myBids, setMyBids] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      getUserBids().then(setMyBids);
+    }
+  }, [user, getUserBids]);
 
   const stats = [
     {
@@ -56,14 +68,14 @@ const Dashboard = () => {
     },
     {
       title: 'Hired',
-      value: myBids.filter((b) => b.bid.status === 'hired').length,
+      value: myBids.filter((b) => b.status === 'hired').length,
       icon: CheckCircle,
       color: 'text-green-500',
       bg: 'bg-green-500/10',
     },
     {
       title: 'Pending',
-      value: myBids.filter((b) => b.bid.status === 'pending').length,
+      value: myBids.filter((b) => b.status === 'pending').length,
       icon: Clock,
       color: 'text-orange-500',
       bg: 'bg-orange-500/10',
@@ -111,7 +123,7 @@ const Dashboard = () => {
                   <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
                   Performance Overview
                 </motion.div>
-                
+
                 <h1 className="text-6xl md:text-8xl font-black text-foreground mb-6 leading-[0.9] tracking-tighter">
                   Welcome back, <br />
                   <span className="gradient-text">{user.name.split(' ')[0]}.</span>
@@ -120,7 +132,7 @@ const Dashboard = () => {
                   Monitor your active projects, track your earnings, and discover new elite opportunities.
                 </p>
               </div>
-              
+
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -163,13 +175,13 @@ const Dashboard = () => {
 
             <Tabs defaultValue="gigs" className="space-y-12">
               <TabsList className="bg-muted/50 backdrop-blur-md p-1 rounded-2xl border border-border/50 h-auto gap-1">
-                <TabsTrigger 
-                  value="gigs" 
+                <TabsTrigger
+                  value="gigs"
                   className="rounded-xl px-8 py-3 font-bold text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all"
                 >
                   My Gigs <span className="ml-2 opacity-50">{myGigs.length}</span>
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="bids"
                   className="rounded-xl px-8 py-3 font-bold text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all"
                 >
@@ -182,7 +194,7 @@ const Dashboard = () => {
                   <div className="grid gap-6">
                     {myGigs.map((gig, index) => (
                       <motion.div
-                        key={gig.id}
+                        key={gig._id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
@@ -208,7 +220,7 @@ const Dashboard = () => {
                                     <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
                                       <FileText className="h-4 w-4" />
                                     </div>
-                                    <span className="text-foreground font-bold">{gig.bids.length}</span> bids
+                                    <span className="text-foreground font-bold">{gig.bids?.length || 0}</span> bids
                                   </span>
                                   <span className="flex items-center gap-2">
                                     <div className="p-1.5 rounded-lg bg-orange-500/10 text-orange-500">
@@ -219,7 +231,7 @@ const Dashboard = () => {
                                 </div>
                               </div>
                               <Button asChild variant="outline" className="rounded-xl border-border/50 bg-background/50 hover:bg-primary hover:text-white hover:border-primary transition-all px-6">
-                                <Link to={`/gigs/${gig.id}`}>
+                                <Link to={`/gigs/${gig._id}`}>
                                   Manage Details
                                   <ArrowRight className="h-4 w-4 ml-2" />
                                 </Link>
@@ -254,61 +266,67 @@ const Dashboard = () => {
               <TabsContent value="bids" className="mt-0 focus-visible:outline-none">
                 {myBids.length > 0 ? (
                   <div className="grid gap-6">
-                    {myBids.map(({ gig, bid }, index) => (
-                      <motion.div
-                        key={bid.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        <Card className={`bg-background/80 backdrop-blur-xl border-border/50 hover:border-primary/30 transition-all duration-300 group overflow-hidden ${bid.status === 'hired' ? 'ring-1 ring-green-500/50' : ''}`}>
-                          <CardContent className="p-0">
-                            <div className="flex flex-col md:flex-row md:items-center p-6 gap-6">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-3">
-                                  <h3 className="font-bold text-xl text-foreground tracking-tight group-hover:text-primary transition-colors">
-                                    {gig.title}
-                                  </h3>
-                                  {getBidStatusBadge(bid.status)}
+                    {myBids.map((bid, index) => {
+                      // Handle potential null gig if gig was deleted
+                      const gigTitle = (bid.gigId as any)?.title || 'Unknown Gig';
+                      const gigId = (bid.gigId as any)?._id || bid.gigId;
+
+                      return (
+                        <motion.div
+                          key={bid._id}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                        >
+                          <Card className={`bg-background/80 backdrop-blur-xl border-border/50 hover:border-primary/30 transition-all duration-300 group overflow-hidden ${bid.status === 'hired' ? 'ring-1 ring-green-500/50' : ''}`}>
+                            <CardContent className="p-0">
+                              <div className="flex flex-col md:flex-row md:items-center p-6 gap-6">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <h3 className="font-bold text-xl text-foreground tracking-tight group-hover:text-primary transition-colors">
+                                      {gigTitle}
+                                    </h3>
+                                    {getBidStatusBadge(bid.status)}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground font-medium">
+                                    <span className="flex items-center gap-2">
+                                      <div className="p-1.5 rounded-lg bg-green-500/10 text-green-500">
+                                        <DollarSign className="h-4 w-4" />
+                                      </div>
+                                      Your bid: <span className="text-foreground font-bold">${bid.amount.toLocaleString()}</span>
+                                    </span>
+                                    <span className="flex items-center gap-2">
+                                      <div className="p-1.5 rounded-lg bg-orange-500/10 text-orange-500">
+                                        <Clock className="h-4 w-4" />
+                                      </div>
+                                      {formatDistanceToNow(new Date(bid.createdAt), { addSuffix: true })}
+                                    </span>
+                                  </div>
+                                  {bid.status === 'hired' && (
+                                    <motion.div
+                                      initial={{ opacity: 0, y: 10 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      className="mt-4 p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-sm font-bold flex items-center gap-2 shadow-sm"
+                                    >
+                                      <div className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center">
+                                        <CheckCircle className="h-4 w-4" />
+                                      </div>
+                                      Elite Project Unlocked: You've been selected for this project!
+                                    </motion.div>
+                                  )}
                                 </div>
-                                <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground font-medium">
-                                  <span className="flex items-center gap-2">
-                                    <div className="p-1.5 rounded-lg bg-green-500/10 text-green-500">
-                                      <DollarSign className="h-4 w-4" />
-                                    </div>
-                                    Your bid: <span className="text-foreground font-bold">${bid.price.toLocaleString()}</span>
-                                  </span>
-                                  <span className="flex items-center gap-2">
-                                    <div className="p-1.5 rounded-lg bg-orange-500/10 text-orange-500">
-                                      <Clock className="h-4 w-4" />
-                                    </div>
-                                    {formatDistanceToNow(new Date(bid.createdAt), { addSuffix: true })}
-                                  </span>
-                                </div>
-                                {bid.status === 'hired' && (
-                                  <motion.div 
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="mt-4 p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-sm font-bold flex items-center gap-2 shadow-sm"
-                                  >
-                                    <div className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center">
-                                      <CheckCircle className="h-4 w-4" />
-                                    </div>
-                                    Elite Project Unlocked: You've been selected for this project!
-                                  </motion.div>
-                                )}
+                                <Button asChild variant="outline" className="rounded-xl border-border/50 bg-background/50 hover:bg-primary hover:text-white hover:border-primary transition-all px-6">
+                                  <Link to={`/gigs/${gigId}`}>
+                                    View Opportunity
+                                    <ArrowRight className="h-4 w-4 ml-2" />
+                                  </Link>
+                                </Button>
                               </div>
-                              <Button asChild variant="outline" className="rounded-xl border-border/50 bg-background/50 hover:bg-primary hover:text-white hover:border-primary transition-all px-6">
-                                <Link to={`/gigs/${gig.id}`}>
-                                  View Opportunity
-                                  <ArrowRight className="h-4 w-4 ml-2" />
-                                </Link>
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <Card className="bg-background/80 backdrop-blur-xl border-border/50 border-dashed py-24">

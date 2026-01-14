@@ -14,6 +14,9 @@ interface BidCardProps {
 }
 
 const BidCard = ({ bid, isOwner, onHire, index = 0 }: BidCardProps) => {
+  // Safe access for freelancer name
+  const freelancerName = typeof bid.freelancerId === 'object' ? (bid.freelancerId as any).name : 'Unknown';
+
   const getStatusBadge = () => {
     switch (bid.status) {
       case 'hired':
@@ -52,11 +55,11 @@ const BidCard = ({ bid, isOwner, onHire, index = 0 }: BidCardProps) => {
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
                 <span className="text-primary-foreground font-medium">
-                  {bid.freelancerName.charAt(0).toUpperCase()}
+                  {freelancerName.charAt(0).toUpperCase()}
                 </span>
               </div>
               <div>
-                <h4 className="font-semibold text-foreground">{bid.freelancerName}</h4>
+                <h4 className="font-semibold text-foreground">{freelancerName}</h4>
                 <p className="text-sm text-muted-foreground">
                   {formatDistanceToNow(new Date(bid.createdAt), { addSuffix: true })}
                 </p>
@@ -67,18 +70,18 @@ const BidCard = ({ bid, isOwner, onHire, index = 0 }: BidCardProps) => {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground mb-4">{bid.message}</p>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                <span className="text-xl font-bold text-foreground">${bid.price.toLocaleString()}</span>
-              </div>
-              {isOwner && bid.status === 'pending' && onHire && (
-                <Button onClick={onHire}>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Hire
-                </Button>
-              )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-primary" />
+              <span className="text-xl font-bold text-foreground">${bid.amount.toLocaleString()}</span>
             </div>
+            {isOwner && bid.status === 'pending' && onHire && (
+              <Button onClick={onHire}>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Hire
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     </motion.div>

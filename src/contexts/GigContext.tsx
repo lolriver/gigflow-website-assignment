@@ -1,229 +1,170 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import api from '@/lib/api';
+import { io, Socket } from 'socket.io-client';
+import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from './AuthContext';
 
 export type GigStatus = 'open' | 'assigned';
 export type BidStatus = 'pending' | 'hired' | 'rejected';
 
 export interface Bid {
-  id: string;
+  _id: string; // MongoDB ID
   gigId: string;
-  freelancerId: string;
-  freelancerName: string;
+  freelancerId: { _id: string; name: string; email: string } | string;
   message: string;
-  price: number;
+  amount: number; // Changed from price to match backend
   status: BidStatus;
-  createdAt: Date;
+  createdAt: string;
 }
 
 export interface Gig {
-  id: string;
+  _id: string; // MongoDB ID
   title: string;
   description: string;
-  category: string;
+  category: string; // Backend might need this if we filter by it, otherwise it's just a string
   budget: number;
-  ownerId: string;
-  ownerName: string;
+  ownerId: { _id: string; name: string; email: string } | string;
   status: GigStatus;
-  createdAt: Date;
-  bids: Bid[];
+  createdAt: string;
+  bids?: Bid[]; // We might need to fetch this separately
 }
 
 interface GigContextType {
   gigs: Gig[];
-  createGig: (title: string, description: string, category: string, budget: number, ownerId: string, ownerName: string) => void;
-  submitBid: (gigId: string, freelancerId: string, freelancerName: string, message: string, price: number) => void;
-  hireBid: (gigId: string, bidId: string) => void;
-  getGigById: (id: string) => Gig | undefined;
-  getUserGigs: (userId: string) => Gig[];
-  getUserBids: (userId: string) => { gig: Gig; bid: Bid }[];
-  searchGigs: (query: string, category?: string) => Gig[];
+  createGig: (title: string, description: string, budget: number, category: string) => Promise<void>;
+  submitBid: (gigId: string, message: string, amount: number) => Promise<void>;
+  hireBid: (gigId: string, bidId: string) => Promise<void>;
+  getGigById: (id: string) => Promise<Gig | undefined>;
+  getGigBids: (gigId: string) => Promise<Bid[]>;
+  searchGigs: (query: string, category?: string) => Promise<void>;
+  getUserBids: () => Promise<Bid[]>;
+  isLoading: boolean;
 }
 
 const GigContext = createContext<GigContextType | undefined>(undefined);
 
-// Sample data for demonstration
-const initialGigs: Gig[] = [
-  {
-    id: '1',
-    title: 'Build a React Dashboard',
-    description: 'Looking for an experienced React developer to build a comprehensive admin dashboard with charts, tables, and user management features. The project requires responsive design and dark mode support.',
-    category: 'Web Development',
-    budget: 1500,
-    ownerId: 'demo-user-1',
-    ownerName: 'Sarah Johnson',
-    status: 'open',
-    createdAt: new Date('2024-01-10'),
-    bids: [
-      {
-        id: 'bid-1',
-        gigId: '1',
-        freelancerId: 'demo-freelancer-1',
-        freelancerName: 'Alex Chen',
-        message: 'I have 5+ years experience with React and have built multiple dashboards. I can deliver this within 2 weeks.',
-        price: 1400,
-        status: 'pending',
-        createdAt: new Date('2024-01-11'),
-      },
-    ],
-  },
-  {
-    id: '2',
-    title: 'E-commerce Website Development',
-    description: 'Need a full-stack developer to create an e-commerce platform with product listings, shopping cart, payment integration, and order management.',
-    category: 'Web Development',
-    budget: 3000,
-    ownerId: 'demo-user-2',
-    ownerName: 'Michael Brown',
-    status: 'open',
-    createdAt: new Date('2024-01-09'),
-    bids: [],
-  },
-  {
-    id: '3',
-    title: 'Mobile App UI/UX Design',
-    description: 'Seeking a talented UI/UX designer to create modern, user-friendly designs for a fitness tracking mobile application. Must include wireframes and high-fidelity mockups.',
-    category: 'Design',
-    budget: 800,
-    ownerId: 'demo-user-3',
-    ownerName: 'Emily Davis',
-    status: 'open',
-    createdAt: new Date('2024-01-08'),
-    bids: [],
-  },
-  {
-    id: '4',
-    title: 'API Integration Specialist',
-    description: 'Looking for a backend developer to integrate multiple third-party APIs including payment gateways, shipping providers, and CRM systems.',
-    category: 'Web Development',
-    budget: 1200,
-    ownerId: 'demo-user-1',
-    ownerName: 'Sarah Johnson',
-    status: 'open',
-    createdAt: new Date('2024-01-07'),
-    bids: [],
-  },
-  {
-    id: '5',
-    title: 'WordPress Custom Theme',
-    description: 'Need a WordPress developer to create a custom theme for a portfolio website. Should be fast, SEO-friendly, and easy to maintain.',
-    category: 'Web Development',
-    budget: 600,
-    ownerId: 'demo-user-4',
-    ownerName: 'David Wilson',
-    status: 'assigned',
-    createdAt: new Date('2024-01-05'),
-    bids: [
-      {
-        id: 'bid-2',
-        gigId: '5',
-        freelancerId: 'demo-freelancer-2',
-        freelancerName: 'Maria Garcia',
-        message: 'WordPress specialist here! I can create a beautiful, fast theme.',
-        price: 550,
-        status: 'hired',
-        createdAt: new Date('2024-01-06'),
-      },
-    ],
-  },
-];
-
 export const GigProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [gigs, setGigs] = useState<Gig[]>(() => {
-    const stored = localStorage.getItem('gigflow_gigs');
-    return stored ? JSON.parse(stored) : initialGigs;
-  });
+  const [gigs, setGigs] = useState<Gig[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [socket, setSocket] = useState<Socket | null>(null);
 
-  const saveGigs = (newGigs: Gig[]) => {
-    setGigs(newGigs);
-    localStorage.setItem('gigflow_gigs', JSON.stringify(newGigs));
-  };
+  // Initialize Socket.io
+  useEffect(() => {
+    // Only connect if user is logged in
+    if (!user) return;
 
-  const createGig = (title: string, description: string, category: string, budget: number, ownerId: string, ownerName: string) => {
-    const newGig: Gig = {
-      id: crypto.randomUUID(),
-      title,
-      description,
-      category,
-      budget,
-      ownerId,
-      ownerName,
-      status: 'open',
-      createdAt: new Date(),
-      bids: [],
-    };
-    saveGigs([newGig, ...gigs]);
-  };
+    const newSocket = io('http://localhost:5000');
+    setSocket(newSocket);
 
-  const submitBid = (gigId: string, freelancerId: string, freelancerName: string, message: string, price: number) => {
-    const newBid: Bid = {
-      id: crypto.randomUUID(),
-      gigId,
-      freelancerId,
-      freelancerName,
-      message,
-      price,
-      status: 'pending',
-      createdAt: new Date(),
-    };
+    newSocket.emit('join', user._id);
 
-    const updatedGigs = gigs.map((gig) =>
-      gig.id === gigId ? { ...gig, bids: [...gig.bids, newBid] } : gig
-    );
-    saveGigs(updatedGigs);
-  };
-
-  const hireBid = (gigId: string, bidId: string) => {
-    const updatedGigs = gigs.map((gig) => {
-      if (gig.id !== gigId) return gig;
-
-      const updatedBids = gig.bids.map((bid) => ({
-        ...bid,
-        status: bid.id === bidId ? 'hired' : 'rejected' as BidStatus,
-      }));
-
-      return {
-        ...gig,
-        status: 'assigned' as GigStatus,
-        bids: updatedBids,
-      };
-    });
-    saveGigs(updatedGigs);
-  };
-
-  const getGigById = (id: string) => gigs.find((gig) => gig.id === id);
-
-  const getUserGigs = (userId: string) => gigs.filter((gig) => gig.ownerId === userId);
-
-  const getUserBids = (userId: string) => {
-    const userBids: { gig: Gig; bid: Bid }[] = [];
-    gigs.forEach((gig) => {
-      gig.bids.forEach((bid) => {
-        if (bid.freelancerId === userId) {
-          userBids.push({ gig, bid });
-        }
+    newSocket.on('notification', (data: any) => {
+      toast({
+        title: "Notification",
+        description: data.message,
+        variant: "default" // or success style
       });
+      // Refresh gigs/data if needed
+      fetchGigs();
     });
-    return userBids;
-  };
 
-  const searchGigs = (query: string, category?: string) => {
-    let filtered = gigs.filter((gig) => gig.status === 'open');
-    
-    if (category && category !== 'All') {
-      filtered = filtered.filter((gig) => gig.category === category);
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [user, toast]);
+
+  const fetchGigs = useCallback(async (query = '', category = 'All') => {
+    setIsLoading(true);
+    try {
+      const { data } = await api.get(`/gigs?keyword=${query}&category=${category}`);
+      setGigs(data);
+    } catch (error) {
+      console.error('Error fetching gigs:', error);
+      toast({ title: "Error", description: "Failed to fetch gigs", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
     }
-    
-    if (query.trim()) {
-      const lowercaseQuery = query.toLowerCase();
-      filtered = filtered.filter(
-        (gig) =>
-          gig.title.toLowerCase().includes(lowercaseQuery) ||
-          gig.description.toLowerCase().includes(lowercaseQuery) ||
-          gig.category.toLowerCase().includes(lowercaseQuery)
-      );
+  }, [toast]);
+
+  useEffect(() => {
+    fetchGigs();
+  }, [fetchGigs]);
+
+  const createGig = useCallback(async (title: string, description: string, budget: number, category: string) => {
+    try {
+      await api.post('/gigs', { title, description, budget, category });
+      toast({ title: "Success", description: "Gig posted successfully!" });
+      fetchGigs();
+    } catch (error) {
+      console.error('Create gig error:', error);
+      toast({ title: "Error", description: "Failed to create gig", variant: "destructive" });
+      throw error;
     }
-    
-    return filtered;
-  };
+  }, [fetchGigs, toast]);
+
+  const submitBid = useCallback(async (gigId: string, message: string, amount: number) => {
+    try {
+      await api.post('/bids', { gigId, message, amount });
+      toast({ title: "Success", description: "Bid submitted successfully!" });
+    } catch (error) {
+      console.error('Submit bid error:', error);
+      toast({ title: "Error", description: "Failed to submit bid", variant: "destructive" });
+      throw error;
+    }
+  }, [toast]);
+
+  const hireBid = useCallback(async (gigId: string, bidId: string) => {
+    try {
+      await api.patch(`/bids/${bidId}/hire`);
+      toast({ title: "Success", description: "Freelancer hired!" });
+      fetchGigs();
+    } catch (error) {
+      console.error('Hire error:', error);
+      toast({ title: "Error", description: "Failed to hire freelancer", variant: "destructive" });
+      throw error;
+    }
+  }, [fetchGigs, toast]);
+
+  const getGigById = useCallback(async (id: string) => {
+    try {
+      // First try to find in existing state to be fast
+      const foundGig = gigs.find(g => g._id === id);
+      if (foundGig) return foundGig;
+
+      // If not found (e.g. refresh), fetch from API
+      const { data } = await api.get(`/gigs/${id}`);
+      return data;
+    } catch (error) {
+      console.error('Error fetching gig by ID', error);
+      return undefined;
+    }
+  }, [gigs]);
+
+  const getGigBids = useCallback(async (gigId: string) => {
+    try {
+      const { data } = await api.get(`/bids/${gigId}`);
+      return data;
+    } catch (error) {
+      console.error('Error fetching bids', error);
+      return [];
+    }
+  }, []);
+
+  const searchGigs = useCallback(async (query: string, category: string = 'All') => {
+    fetchGigs(query, category);
+  }, [fetchGigs]);
+
+  const getUserBids = useCallback(async () => {
+    try {
+      const { data } = await api.get('/bids/my-bids');
+      return data;
+    } catch (error) {
+      console.error('Error fetching user bids', error);
+      return [];
+    }
+  }, []);
 
   return (
     <GigContext.Provider
@@ -233,9 +174,10 @@ export const GigProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         submitBid,
         hireBid,
         getGigById,
-        getUserGigs,
-        getUserBids,
+        getGigBids,
         searchGigs,
+        getUserBids,
+        isLoading,
       }}
     >
       {children}

@@ -23,10 +23,10 @@ const Header = () => {
     navigate('/');
   };
 
-    const navLinks = [
-      { href: '/gigs', label: 'Browse Gigs' },
-      { href: '/dashboard', label: 'Dashboard', protected: true },
-    ];
+  const navLinks = [
+    { href: '/gigs', label: 'Browse Gigs' },
+    { href: '/dashboard', label: 'Dashboard', protected: true },
+  ];
 
 
   const isActive = (path: string) => location.pathname === path;
@@ -36,9 +36,7 @@ const Header = () => {
       <div className="container flex h-20 items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-3 group">
-          <div className="bg-white text-black font-black w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-transform group-hover:scale-110">
-            GF
-          </div>
+          <img src="/logo.png" alt="GigFlow" className="w-10 h-10 rounded-xl transition-transform group-hover:scale-110" />
           <span className="text-2xl font-bold text-foreground tracking-tighter">GigFlow</span>
         </Link>
 
@@ -50,9 +48,8 @@ const Header = () => {
               <Link
                 key={link.href}
                 to={link.href}
-                className={`text-[10px] font-bold tracking-[0.25em] transition-colors hover:text-primary ${
-                  isActive(link.href) ? 'text-primary' : 'text-muted-foreground/60'
-                }`}
+                className={`text-[10px] font-bold tracking-[0.25em] transition-colors hover:text-primary ${isActive(link.href) ? 'text-primary' : 'text-muted-foreground/60'
+                  }`}
               >
                 {link.label.toUpperCase()}
               </Link>
@@ -68,6 +65,9 @@ const Header = () => {
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full border border-white/10 p-0 overflow-hidden hover:border-primary/50 transition-colors">
                   <div className="bg-primary/20 w-full h-full flex items-center justify-center">
                     <User className="h-5 w-5 text-primary" />
+                    {user?.roles?.includes('freelancer') && (
+                      <div className="absolute bottom-2 right-2 h-2 w-2 rounded-full bg-primary" />
+                    )}
                   </div>
                 </Button>
               </DropdownMenuTrigger>
@@ -76,7 +76,7 @@ const Header = () => {
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">{user?.email}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {user?.role === 'employer' ? 'Employer' : 'Freelancer'}
+                      {user?.roles?.includes('employer') ? 'Employer' : 'Freelancer'}
                     </p>
                   </div>
                 </div>
@@ -142,9 +142,8 @@ const Header = () => {
                     key={link.href}
                     to={link.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`text-sm font-medium ${
-                      isActive(link.href) ? 'text-primary' : 'text-muted-foreground'
-                    }`}
+                    className={`text-sm font-medium ${isActive(link.href) ? 'text-primary' : 'text-muted-foreground'
+                      }`}
                   >
                     {link.label}
                   </Link>

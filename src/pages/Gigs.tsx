@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,20 @@ import { Search, Plus, Briefcase, ArrowRight } from 'lucide-react';
 const Gigs = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const { searchGigs } = useGigs();
+  const { gigs, searchGigs } = useGigs();
   const { isAuthenticated } = useAuth();
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Trigger API search when query or category changes
+  useEffect(() => {
+    searchGigs(debouncedQuery, selectedCategory);
+  }, [debouncedQuery, selectedCategory, searchGigs]);
 
   const CATEGORIES = [
     'All',
@@ -26,7 +38,8 @@ const Gigs = () => {
     'Other'
   ];
 
-  const filteredGigs = searchGigs(searchQuery, selectedCategory);
+  // API handles filtering now
+  const displayGigs = gigs;
 
   return (
     <Layout>
@@ -53,16 +66,16 @@ const Gigs = () => {
                   <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
                   Elite Opportunities Await
                 </motion.div>
-                
+
                 <h1 className="text-6xl md:text-8xl font-black text-foreground mb-6 leading-[0.9] tracking-tighter">
                   Browse <br />
                   <span className="gradient-text">Gigs.</span>
                 </h1>
                 <p className="text-xl text-muted-foreground max-w-lg leading-relaxed">
-                  Find your next high-impact project from {filteredGigs.length} premium opportunities curated for elite talent.
+                  Find your next high-impact project from {displayGigs.length} premium opportunities curated for elite talent.
                 </p>
               </div>
-              
+
               {isAuthenticated && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -103,11 +116,10 @@ const Gigs = () => {
                     transition={{ delay: 0.1 + idx * 0.05 }}
                     key={category}
                     onClick={() => setSelectedCategory(category)}
-                    className={`px-6 py-3 rounded-full text-sm font-bold transition-all duration-300 border ${
-                      selectedCategory === category
-                        ? 'bg-primary text-white border-primary shadow-glow scale-105'
-                        : 'bg-background/50 text-muted-foreground border-border hover:border-primary/50 hover:text-primary backdrop-blur-sm'
-                    }`}
+                    className={`px-6 py-3 rounded-full text-sm font-bold transition-all duration-300 border ${selectedCategory === category
+                      ? 'bg-primary text-white border-primary shadow-glow scale-105'
+                      : 'bg-background/50 text-muted-foreground border-border hover:border-primary/50 hover:text-primary backdrop-blur-sm'
+                      }`}
                   >
                     {category}
                   </motion.button>
@@ -117,10 +129,10 @@ const Gigs = () => {
           </motion.div>
 
           {/* Gigs Grid */}
-          {filteredGigs.length > 0 ? (
+          {displayGigs.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredGigs.map((gig, index) => (
-                <GigCard key={gig.id} gig={gig} index={index} />
+              {displayGigs.map((gig, index) => (
+                <GigCard key={gig._id} gig={gig} index={index} />
               ))}
             </div>
           ) : (

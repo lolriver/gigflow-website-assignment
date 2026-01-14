@@ -14,6 +14,7 @@ import CreateGig from "./pages/CreateGig";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import HoverReceiver from "@/visual-edits/VisualEditsMessenger";
+import ScrollToTop from "@/components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ const App = () => (
           <Sonner />
           <HoverReceiver />
           <BrowserRouter>
+            <ScrollToTop />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />

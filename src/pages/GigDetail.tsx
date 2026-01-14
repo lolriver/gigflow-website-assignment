@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import Layout from '@/components/layout/Layout';
 import BidCard from '@/components/gigs/BidCard';
-import { useGigs } from '@/contexts/GigContext';
+import { useGigs, Gig, Bid } from '@/contexts/GigContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { DollarSign, User, Clock, ArrowLeft, Send, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
@@ -19,16 +19,87 @@ import { useToast } from '@/hooks/use-toast';
 const GigDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getGigById, submitBid, hireBid } = useGigs();
+  const { getGigById, submitBid, hireBid, getGigBids, getUserBids } = useGigs();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  
+
+  const [gig, setGig] = useState<Gig | null>(null);
+  const [bids, setBids] = useState<Bid[]>([]);
+  const [loading, setLoading] = useState(true);
   const [bidMessage, setBidMessage] = useState('');
   const [bidPrice, setBidPrice] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [bidDialogOpen, setBidDialogOpen] = useState(false);
 
-  const gig = getGigById(id || '');
+  useEffect(() => {
+    const fetchGigData = async () => {
+      if (!id) return;
+      setLoading(true);
+      try {
+        const gigData = await getGigById(id);
+        if (gigData) {
+          setGig(gigData);
+
+          // Define fetchBids function
+          const fetchBids = async () => {
+            const ownerIdStr = typeof gigData.ownerId === 'object'
+              ? (gigData.ownerId as any)._id
+              : gigData.ownerId;
+
+            if (user) {
+              if (user._id === ownerIdStr) {
+                // User is owner: fetch all bids
+                try {
+                  const bidsData = await getGigBids(id);
+                  setBids(bidsData);
+                } catch (e) {
+                  console.error("Not authorized to view bids, skipping.");
+                }
+              } else {
+                // User is freelancer: fetch ONLY their bid for this gig
+                try {
+                  const myBids = await getUserBids();
+                  // Filter for this specific gig
+                  const myBidForThisGig = myBids.find(b => {
+                    const bGigId = (typeof b.gigId === 'object' && b.gigId !== null)
+                      ? (b.gigId as any)._id
+                      : b.gigId;
+                    return bGigId === id;
+                  });
+
+                  if (myBidForThisGig) {
+                    setBids([myBidForThisGig]);
+                  } else {
+                    setBids([]);
+                  }
+                } catch (e) {
+                  console.error("Error fetching user bid status", e);
+                  setBids([]);
+                }
+              }
+            }
+          };
+
+          await fetchBids();
+        }
+      } catch (error) {
+        console.error("Failed to fetch gig details", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGigData();
+  }, [id, getGigById, getGigBids, user]);
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="container py-16 flex justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
   if (!gig) {
     return (
@@ -45,8 +116,15 @@ const GigDetail = () => {
     );
   }
 
-  const isOwner = user?.id === gig.ownerId;
-  const hasAlreadyBid = gig.bids.some((bid) => bid.freelancerId === user?.id);
+  const ownerIdString = (typeof gig.ownerId === 'object' && gig.ownerId !== null) ? (gig.ownerId as any)._id : gig.ownerId;
+  const ownerName = (typeof gig.ownerId === 'object' && gig.ownerId !== null) ? (gig.ownerId as any).name : 'Unknown';
+
+  const isOwner = user?._id === ownerIdString;
+  const hasAlreadyBid = bids.some((bid) => {
+    const freelancerIdStr = typeof bid.freelancerId === 'object' ? (bid.freelancerId as any)._id : bid.freelancerId;
+    return freelancerIdStr === user?._id;
+  });
+
   const canBid = isAuthenticated && !isOwner && gig.status === 'open' && !hasAlreadyBid;
 
   const handleSubmitBid = async () => {
@@ -64,7 +142,8 @@ const GigDetail = () => {
 
     setSubmitting(true);
     try {
-      submitBid(gig.id, user.id, user.name, bidMessage.trim(), price);
+      // Adjusted signature: submitBid(gigId, message, amount)
+      await submitBid(gig._id, bidMessage.trim(), price);
       toast({
         title: 'Bid submitted!',
         description: 'Your bid has been sent to the client.',
@@ -72,6 +151,21 @@ const GigDetail = () => {
       setBidDialogOpen(false);
       setBidMessage('');
       setBidPrice('');
+      // Refresh bids intelligently
+      if (user?._id === ownerIdString) {
+        const updatedBids = await getGigBids(gig._id);
+        setBids(updatedBids);
+      } else {
+        // Freelancer: re-fetch my bids
+        const myBids = await getUserBids();
+        const myBidForThisGig = myBids.find(b => {
+          const bGigId = (typeof b.gigId === 'object' && b.gigId !== null)
+            ? (b.gigId as any)._id
+            : b.gigId;
+          return bGigId === gig._id;
+        });
+        if (myBidForThisGig) setBids([myBidForThisGig]);
+      }
     } catch (error) {
       toast({
         title: 'Error',
@@ -83,12 +177,22 @@ const GigDetail = () => {
     }
   };
 
-  const handleHire = (bidId: string, freelancerName: string) => {
-    hireBid(gig.id, bidId);
-    toast({
-      title: 'Freelancer hired!',
-      description: `You have successfully hired ${freelancerName}.`,
-    });
+  const handleHire = async (bidId: string, freelancerName: string) => {
+    try {
+      await hireBid(gig._id, bidId);
+      toast({
+        title: 'Freelancer hired!',
+        description: `You have successfully hired ${freelancerName}.`,
+      });
+      // Refresh gig status
+      const updatedGig = await getGigById(gig._id);
+      if (updatedGig) setGig(updatedGig);
+      // Refresh bids
+      const updatedBids = await getGigBids(gig._id);
+      setBids(updatedBids);
+    } catch (e) {
+      // toast handled in context
+    }
   };
 
   return (
@@ -119,7 +223,7 @@ const GigDetail = () => {
                     <CardTitle className="text-2xl md:text-3xl font-bold">
                       {gig.title}
                     </CardTitle>
-                    <Badge 
+                    <Badge
                       variant={gig.status === 'open' ? 'default' : 'secondary'}
                       className="shrink-0"
                     >
@@ -131,12 +235,12 @@ const GigDetail = () => {
                   <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
                     {gig.description}
                   </p>
-                  
+
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-border">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-primary" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Budget</p>
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Budget</p>
                         <p className="font-semibold text-foreground">${gig.budget.toLocaleString()}</p>
                       </div>
                     </div>
@@ -144,7 +248,7 @@ const GigDetail = () => {
                       <User className="h-5 w-5 text-primary" />
                       <div>
                         <p className="text-sm text-muted-foreground">Posted by</p>
-                        <p className="font-semibold text-foreground">{gig.ownerName}</p>
+                        <p className="font-semibold text-foreground">{ownerName}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -163,20 +267,23 @@ const GigDetail = () => {
               {/* Bids Section */}
               <div>
                 <h2 className="text-xl font-semibold text-foreground mb-4">
-                  Bids ({gig.bids.length})
+                  Bids ({bids.length})
                 </h2>
-                
-                {gig.bids.length > 0 ? (
+
+                {bids.length > 0 ? (
                   <div className="space-y-4">
-                    {gig.bids.map((bid, index) => (
-                      <BidCard
-                        key={bid.id}
-                        bid={bid}
-                        isOwner={isOwner}
-                        onHire={gig.status === 'open' ? () => handleHire(bid.id, bid.freelancerName) : undefined}
-                        index={index}
-                      />
-                    ))}
+                    {bids.map((bid, index) => {
+                      const fName = typeof bid.freelancerId === 'object' ? (bid.freelancerId as any).name : 'Unknown';
+                      return (
+                        <BidCard
+                          key={bid._id}
+                          bid={bid}
+                          isOwner={isOwner}
+                          onHire={gig.status === 'open' ? () => handleHire(bid._id, fName) : undefined}
+                          index={index}
+                        />
+                      );
+                    })}
                   </div>
                 ) : (
                   <Card className="shadow-card">
@@ -210,10 +317,10 @@ const GigDetail = () => {
                       </div>
                     ) : isOwner ? (
                       <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <CheckCircle className="h-4 w-4 text-primary" />
-                            This is your gig
-                          </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <CheckCircle className="h-4 w-4 text-primary" />
+                          This is your gig
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           Review the bids below and click "Hire" to select a freelancer.
                         </p>
@@ -223,11 +330,11 @@ const GigDetail = () => {
                         This gig has been assigned and is no longer accepting bids.
                       </div>
                     ) : hasAlreadyBid ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-sm text-primary">
-                            <CheckCircle className="h-4 w-4" />
-                            Bid submitted
-                          </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-primary">
+                          <CheckCircle className="h-4 w-4" />
+                          Bid submitted
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           You have already submitted a bid on this gig. Wait for the client's response.
                         </p>
@@ -274,8 +381,8 @@ const GigDetail = () => {
                             <Button variant="outline" onClick={() => setBidDialogOpen(false)}>
                               Cancel
                             </Button>
-                            <Button 
-                              onClick={handleSubmitBid} 
+                            <Button
+                              onClick={handleSubmitBid}
                               disabled={submitting || !bidMessage.trim() || !bidPrice}
                             >
                               {submitting ? (
