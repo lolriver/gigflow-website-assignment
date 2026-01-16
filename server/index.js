@@ -18,7 +18,10 @@ const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
 
 const io = new Server(httpServer, {
     cors: {
-        origin: clientUrl,
+        origin: [
+            'http://localhost:5173',
+            'https://gigflowsite.netlify.app'
+        ],
         credentials: true
     }
 });
@@ -29,8 +32,13 @@ app.set('io', io);
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
+const allowedOrigins = [
+    'http://localhost:5173',
+    'https://gigflowsite.netlify.app'
+];
+
 app.use(cors({
-    origin: clientUrl,
+    origin: allowedOrigins,
     credentials: true
 }));
 

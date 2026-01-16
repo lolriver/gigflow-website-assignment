@@ -55,7 +55,14 @@ export const GigProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Only connect if user is logged in
     if (!user) return;
 
-    const newSocket = io('http://localhost:5000');
+    // Use the backend URL from environment or default to local/proxy
+    const socketUrl = import.meta.env.VITE_API_URL
+      ? import.meta.env.VITE_API_URL.replace('/api', '') // Remove /api suffix for socket connection
+      : 'http://localhost:5000';
+
+    const newSocket = io(socketUrl, {
+      withCredentials: true
+    });
     setSocket(newSocket);
 
     newSocket.emit('join', user._id);
