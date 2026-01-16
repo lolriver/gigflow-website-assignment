@@ -26,8 +26,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Optional: Check if token is valid on mount (if we added a /me endpoint)
-  // For now we rely on localStorage + cookie failing on request
+  // Check if token is valid on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data } = await api.get('/auth/me');
+        setUser(data);
+        localStorage.setItem('gigflow_user', JSON.stringify(data));
+      } catch (error) {
+        // If /me fails (401), clear local state
+        setUser(null);
+        localStorage.removeItem('gigflow_user');
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);

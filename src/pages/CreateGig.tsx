@@ -87,7 +87,7 @@ const CreateGig = () => {
 
     setLoading(true);
     try {
-      createGig(title.trim(), description.trim(), budgetNum, category);
+      await createGig(title.trim(), description.trim(), budgetNum, category);
       toast({
         title: 'Gig posted!',
         description: 'Your gig is now live and accepting bids.',

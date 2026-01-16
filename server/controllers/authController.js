@@ -62,8 +62,23 @@ const logoutUser = (req, res) => {
     res.cookie('jwt', '', {
         httpOnly: true,
         expires: new Date(0),
+        secure: process.env.NODE_ENV !== 'development',
+        sameSite: process.env.NODE_ENV !== 'development' ? 'none' : 'strict',
     });
     res.status(200).json({ message: 'Logged out successfully' });
 };
 
-export { authUser, registerUser, logoutUser };
+// @desc    Get current user profile
+// @route   GET /api/auth/me
+// @access  Private
+const getMe = async (req, res) => {
+    const user = {
+        _id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        roles: req.user.roles,
+    };
+    res.status(200).json(user);
+};
+
+export { authUser, registerUser, logoutUser, getMe };
